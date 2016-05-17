@@ -32,32 +32,36 @@
 #include <stdint.h>
 
 
-#define _XTAL_FREQ		20000000	// Den interna klockans frekvens. Ca 2 MHz
+#define _XTAL_FREQ		20000000		// Den interna klockans frekvens. Ca 2 MHz
 #define FOSC			_XTAL_FREQ	// Klockans frekvens
 #define TOSC			1/FOSC		// Klockans periodtid
 
 #define FPWM			5000		// 5 kHz, PWM-frekvens
 #define TPWM			1/FPWM		// PWM-Periodtid
 #define PWM_PRESCALER	4
+#define PWM_MAX			62
 
-#define TIMER0_PULSES 3				// Antalet pulser som det tar att ändra LED
+#define TIMER0_PULSES   1				// Antalet pulser som det tar att ändra LED
 uint8_t timer10ms = TIMER0_PULSES;	// Räknas ned vid interrupt
 
 /*
  * Motor driver
- * Left
- *		B1	PWM4	RC1
- *		B2	PWM3	RA2	
- * Right
- *		A2	PWM2	RC3
- *		A1	PWM1	RC5
- */
-#define LEFT_PWM_F		LATCbits.RC1
-#define LEFT_PWM_B		LATAbits.RA2
-#define RIGHT_PWM_F		LATCbits.RC3
-#define RIGHT_PWM_B		LATCbits.RC5
-#define LED				LATBbits.RB7
+ * Left - Yellow
+ *		A2	PWM2	RC3 Forward
+ *		A1	PWM1	RC5	Back
 
+ * Right - Green
+ *		B2	PWM3	RA2	Forward
+ *		B1	PWM4	RC1	Back
+ */
+
+
+#define LEFT_PWM_F		PWM2DCH
+#define LEFT_PWM_B		PWM1DCH
+#define RIGHT_PWM_F		PWM3DCH
+#define RIGHT_PWM_B		PWM4DCH
+#define LED				LATBbits.LATB7
+#define BUTTON			PORTBbits.RB6
 
 
 void systemInit(void);
@@ -66,9 +70,96 @@ void interrupt ISR(void);
 void main(void)
 {
 	systemInit();
+	char speed = 0;
+	char run = 1;
 	
-	while(1)
-	{
+	
+	LED = 1;
+	while(1){
+		/*
+		if(BUTTON)
+			run = 1;
+		
+		while(run)
+		{
+		 */
+			static char state = 0;
+
+			switch(state)
+			{
+			case 0:
+				if(timer10ms == 0)
+				{
+					speed++;
+					timer10ms = TIMER0_PULSES;
+				}
+
+				RIGHT_PWM_F = speed;
+				LEFT_PWM_F = speed;
+
+				if(speed == PWM_MAX)
+				{
+					RIGHT_PWM_F = PWM_MAX;
+					LEFT_PWM_F = PWM_MAX;
+					state = 1;
+				}
+				break;
+
+			case 1:
+				if(timer10ms == 0)
+				{
+					speed--;
+					timer10ms = TIMER0_PULSES;
+				}
+
+				RIGHT_PWM_F = speed;
+				RIGHT_PWM_F = speed;
+
+				if(speed == 0)
+				{
+					state = 2;
+					RIGHT_PWM_F = 0;
+					LEFT_PWM_F = 0;
+				}
+
+				break;
+			case 2:
+				if(timer10ms == 0)
+				{
+					speed++;
+					timer10ms = TIMER0_PULSES;
+				}
+
+				RIGHT_PWM_B = speed;
+				LEFT_PWM_B = speed;
+
+				if(speed == PWM_MAX)
+				{
+					RIGHT_PWM_B = PWM_MAX;
+					LEFT_PWM_B = PWM_MAX;
+					state = 3;
+				}
+				break;
+
+			case 3:
+				if(timer10ms == 0)
+				{
+					speed--;
+					timer10ms = TIMER0_PULSES;
+				}
+
+				RIGHT_PWM_B = speed;
+				RIGHT_PWM_B = speed;
+
+				if(speed == 0)
+				{
+					state = 0;
+					RIGHT_PWM_B = 0;
+					LEFT_PWM_B = 0;
+				}
+
+				break;
+			}
 		
 	}
 }
@@ -76,11 +167,12 @@ void main(void)
 
 void systemInit()
 {
-	TRISCbits.TRISC1 = 0;	// LEFT_PWM_F
-	TRISAbits.TRISA2 = 0;	// LEFT_PWM_B
-	TRISCbits.TRISC3 = 0;	// RIGHT_PWM_F
-	TRISCbits.TRISC5 = 0;	// RIGHT_PWM_B	
+	TRISCbits.TRISC1 = 0;	
+	TRISAbits.TRISA2 = 0;	
+	TRISCbits.TRISC3 = 0;	
+	TRISCbits.TRISC5 = 0;	
 	TRISBbits.TRISB7 = 0;	// LED		
+	TRISBbits.TRISB6 = 1;	// Button
 	
     // timer0 initiering (se 160502_timer.txt)
 	OPTION_REG = 0b11010100;
@@ -93,11 +185,32 @@ void systemInit()
 	PR2 = (FOSC / (4 * FPWM * PWM_PRESCALER) ) - 1;
 	
 	// PWM initiering
-	CCP1CON = 0b00001100;		// Ställer in PWM samt bit <4:5> är första bitarna åt duty-cycle
-	CCPR1L  = LED_Brightness;	// Håller värdet för de 8 sista bitar åt duty-cycle				
+	PWM1CON = 0b11000000;
+	PWM2CON = 0b11000000;
+	PWM3CON = 0b11000000;
+	PWM4CON = 0b11000000;
+	
+	PWM1DCH = 0; // PWM Duty Cycle High Bits (de 8 största bitarna)
+	PWM1DCL = 0;
+	PWM2DCH = 0;
+	PWM2DCL = 0;
+	PWM3DCH = 0; 
+	PWM3DCL = 0; 
+	PWM4DCH = 0;
+	PWM4DCL = 0;
+	
+	ANSELB = 1;
+	
+	LED = 0;
 }
 
 void interrupt ISR(void)
 {
-	
+	GIE = 0;
+    if(T0IE && T0IF)
+    {
+		timer10ms--;
+        T0IF = 0;
+    }
+	GIE = 1;
 }
