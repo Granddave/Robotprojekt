@@ -32,17 +32,19 @@
 #include <stdint.h>
 
 
-#define _XTAL_FREQ		20000000		// Den interna klockans frekvens. Ca 2 MHz
+#define _XTAL_FREQ		16000000		// Den interna klockans frekvens. Ca 2 MHz
 #define FOSC			_XTAL_FREQ	// Klockans frekvens
 #define TOSC			1/FOSC		// Klockans periodtid
 
 #define FPWM			5000		// 5 kHz, PWM-frekvens
 #define TPWM			1/FPWM		// PWM-Periodtid
 #define PWM_PRESCALER	4
-#define PWM_MAX			62
+#define PWM_MAX			200
 
-#define TIMER0_PULSES   1				// Antalet pulser som det tar att ändra LED
-uint8_t timer10ms = TIMER0_PULSES;	// Räknas ned vid interrupt
+#define TIMER0_PULSES   10			// Antalet pulser som det tar att ändra LED
+int8_t timer = TIMER0_PULSES;	// Räknas ned vid interrupt
+
+char speed = 0;
 
 /*
  * Motor driver
@@ -62,6 +64,7 @@ uint8_t timer10ms = TIMER0_PULSES;	// Räknas ned vid interrupt
 #define RIGHT_PWM_B		PWM4DCH
 #define LED				LATBbits.LATB7
 #define BUTTON			PORTBbits.RB6
+#define SENSOR			PORTBbits.RB5
 
 
 void systemInit(void);
@@ -70,28 +73,33 @@ void interrupt ISR(void);
 void main(void)
 {
 	systemInit();
-	char speed = 0;
-	char run = 1;
+	char run = 0;
 	
 	
-	LED = 1;
+	LED = 0;
 	while(1){
-		/*
+#if 1
+			if(SENSOR)
+				LED = 1;
+			else 
+				LED = 0;
+				
+#else
 		if(BUTTON)
 			run = 1;
 		
-		while(run)
+		if(run)
 		{
-		 */
 			static char state = 0;
 
 			switch(state)
 			{
 			case 0:
-				if(timer10ms == 0)
+				LED = 0;
+				if(timer <= 0)
 				{
 					speed++;
-					timer10ms = TIMER0_PULSES;
+					timer = TIMER0_PULSES;
 				}
 
 				RIGHT_PWM_F = speed;
@@ -99,21 +107,21 @@ void main(void)
 
 				if(speed == PWM_MAX)
 				{
-					RIGHT_PWM_F = PWM_MAX;
-					LEFT_PWM_F = PWM_MAX;
 					state = 1;
+					__delay_ms(2000);
 				}
 				break;
 
 			case 1:
-				if(timer10ms == 0)
+				LED = 0;
+				if(timer <= 0)
 				{
 					speed--;
-					timer10ms = TIMER0_PULSES;
+					timer = TIMER0_PULSES;
 				}
 
 				RIGHT_PWM_F = speed;
-				RIGHT_PWM_F = speed;
+				LEFT_PWM_F = speed;
 
 				if(speed == 0)
 				{
@@ -124,10 +132,11 @@ void main(void)
 
 				break;
 			case 2:
-				if(timer10ms == 0)
+				LED = 1;
+				if(timer <= 0)
 				{
 					speed++;
-					timer10ms = TIMER0_PULSES;
+					timer = TIMER0_PULSES;
 				}
 
 				RIGHT_PWM_B = speed;
@@ -142,14 +151,15 @@ void main(void)
 				break;
 
 			case 3:
-				if(timer10ms == 0)
+				LED = 1;
+				if(timer <= 0)
 				{
 					speed--;
-					timer10ms = TIMER0_PULSES;
+					timer = TIMER0_PULSES;
 				}
 
 				RIGHT_PWM_B = speed;
-				RIGHT_PWM_B = speed;
+				LEFT_PWM_B = speed;
 
 				if(speed == 0)
 				{
@@ -160,10 +170,10 @@ void main(void)
 
 				break;
 			}
-		
+		}
+#endif
 	}
 }
-
 
 void systemInit()
 {
@@ -174,6 +184,10 @@ void systemInit()
 	TRISBbits.TRISB7 = 0;	// LED		
 	TRISBbits.TRISB6 = 1;	// Button
 	
+	TRISBbits.TRISB5 = 1;	// IR-Sensor 8
+	
+	OSCCON = 0b01111010;	// 16 MHz
+
     // timer0 initiering (se 160502_timer.txt)
 	OPTION_REG = 0b11010100;
 	INTCON	   = 0b10100000;
@@ -199,9 +213,8 @@ void systemInit()
 	PWM4DCH = 0;
 	PWM4DCL = 0;
 	
-	ANSELB = 1;
-	
-	LED = 0;
+	ANSELB = 0;
+
 }
 
 void interrupt ISR(void)
@@ -209,7 +222,7 @@ void interrupt ISR(void)
 	GIE = 0;
     if(T0IE && T0IF)
     {
-		timer10ms--;
+		timer--;
         T0IF = 0;
     }
 	GIE = 1;
