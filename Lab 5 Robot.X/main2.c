@@ -42,7 +42,7 @@
 #define PWM_MAX			200
 
 #define TIMER0_PULSES   10			// Antalet pulser som det tar att ändra LED
-int8_t timer = TIMER0_PULSES;	// Räknas ned vid interrupt
+int8_t timer = TIMER0_PULSES;		// Räknas ned vid interrupt
 
 char speed = 0;
 
@@ -57,26 +57,14 @@ char speed = 0;
  *		B1	PWM4	RC1	Back
  */
 
-// Outputs
+
 #define LEFT_PWM_F		PWM2DCH
 #define LEFT_PWM_B		PWM1DCH
 #define RIGHT_PWM_F		PWM3DCH
 #define RIGHT_PWM_B		PWM4DCH
-
 #define LED				LATBbits.LATB7
-
-// Inputs
 #define BUTTON			PORTBbits.RB6
-
-
-#define SENSOR_1			PORTAbits.RA4
-#define SENSOR_2			PORTCbits.RC4
-#define SENSOR_3			PORTCbits.RC6
-#define SENSOR_4			PORTCbits.RC7
-#define SENSOR_5			PORTCbits.RC0
-#define SENSOR_6			PORTCbits.RC2
-#define SENSOR_7			PORTBbits.RB4
-#define SENSOR_8			PORTBbits.RB5
+#define SENSOR8			PORTBbits.RB5
 
 
 void systemInit(void);
@@ -88,13 +76,13 @@ void main(void)
 	char run = 0;
 	
 	
-	LED = 1;
+	LED = 0;
 	while(1){
-#if 0
-		if(SENSOR_6)
-			LED = 0;
-		else 
-			LED = 1;
+#if 1
+			if(SENSOR8)
+				LED = 1;
+			else 
+				LED = 0;
 				
 #else
 		if(BUTTON)
@@ -106,7 +94,7 @@ void main(void)
 
 			switch(state)
 			{
-			case 0:	
+			case 0:
 				LED = 0;
 				if(timer <= 0)
 				{
@@ -124,7 +112,7 @@ void main(void)
 				}
 				break;
 
-			case 1:	
+			case 1:
 				LED = 0;
 				if(timer <= 0)
 				{
@@ -188,39 +176,23 @@ void main(void)
 }
 
 void systemInit()
-{	
-	// Outputs
-	TRISCbits.TRISC1 = 0; 	// PWM outputs	
+{
+	TRISCbits.TRISC1 = 0;	
 	TRISAbits.TRISA2 = 0;	
 	TRISCbits.TRISC3 = 0;	
-	TRISCbits.TRISC5 = 0;
+	TRISCbits.TRISC5 = 0;	
 	TRISBbits.TRISB7 = 0;	// LED		
-
-	// Inputs
 	TRISBbits.TRISB6 = 1;	// Button
 	
-	TRISAbits.TRISA4 = 1;	// IR-Sensor 1
-	TRISCbits.TRISC4 = 1;	// IR-Sensor 2
-	TRISCbits.TRISC6 = 1;	// IR-Sensor 3
-	TRISCbits.TRISC7 = 1;	// IR-Sensor 4
-	TRISCbits.TRISC0 = 1;	// IR-Sensor 5
-	TRISCbits.TRISC2 = 1;	// IR-Sensor 6
-	TRISBbits.TRISB4 = 1;	// IR-Sensor 7
 	TRISBbits.TRISB5 = 1;	// IR-Sensor 8
-
-	// Ports set to digital
-	ANSELB = 0;				
-	ANSELC = 0;	
-	ANSELA = 0;
 	
-	// Internal clock
 	OSCCON = 0b01111010;	// 16 MHz
 
-    // timer0 initiering till interrupt 
+    // timer0 initiering (se 160502_timer.txt)
 	OPTION_REG = 0b11010100;
 	INTCON	   = 0b10100000;
 	
-	// Timer2 initiering till PWM
+	// Timer2 initiering
 	T2CON = 0b00000111;		// Aktiverar Timer 2, prescaler = 16
 	
 	// PR2 initiering 
@@ -232,15 +204,17 @@ void systemInit()
 	PWM3CON = 0b11000000;
 	PWM4CON = 0b11000000;
 	
-	// PWM Duty Cycle 
-	PWM1DCH = 0; // High Bits (de 8 största bitarna)
-	PWM1DCL = 0; // Low Bits (de 2 minsta bitarna)
+	PWM1DCH = 0; // PWM Duty Cycle High Bits (de 8 största bitarna)
+	PWM1DCL = 0;
 	PWM2DCH = 0;
 	PWM2DCL = 0;
 	PWM3DCH = 0; 
 	PWM3DCL = 0; 
 	PWM4DCH = 0;
 	PWM4DCL = 0;
+	
+	ANSELB = 0;
+
 }
 
 void interrupt ISR(void)
