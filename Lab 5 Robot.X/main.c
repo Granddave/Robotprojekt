@@ -41,10 +41,12 @@
 #define PWM_PRESCALER	4
 #define PWM_MAX			200
 
-#define TIMER0_PULSES   10			// Antalet pulser som det tar att ändra LED
-int8_t timer = TIMER0_PULSES;	// Räknas ned vid interrupt
+#define SPEED_MAX		PWM_MAX
+#define deltaSpeed		3	
 
-char speed = 0;
+#define TIMER0_PULSES   2			// Antalet pulser som det tar att ändra LED
+int8_t timer0 = TIMER0_PULSES;		// Räknas ned vid interrupt
+
 
 /*
  * Motor driver
@@ -62,130 +64,52 @@ char speed = 0;
 #define LEFT_PWM_B		PWM1DCH
 #define RIGHT_PWM_F		PWM3DCH
 #define RIGHT_PWM_B		PWM4DCH
-
 #define LED				LATBbits.LATB7
 
 // Inputs
+#define SENSOR_1		PORTAbits.RA4
+#define SENSOR_2		PORTCbits.RC4
+#define SENSOR_3		PORTCbits.RC6
+#define SENSOR_4		PORTCbits.RC7
+#define SENSOR_5		PORTCbits.RC0
+#define SENSOR_6		PORTCbits.RC2
+#define SENSOR_7		PORTBbits.RB4
+#define SENSOR_8		PORTBbits.RB5
 #define BUTTON			PORTBbits.RB6
 
 
-#define SENSOR_1			PORTAbits.RA4
-#define SENSOR_2			PORTCbits.RC4
-#define SENSOR_3			PORTCbits.RC6
-#define SENSOR_4			PORTCbits.RC7
-#define SENSOR_5			PORTCbits.RC0
-#define SENSOR_6			PORTCbits.RC2
-#define SENSOR_7			PORTBbits.RB4
-#define SENSOR_8			PORTBbits.RB5
-
-
+// === Declarations ===
 void systemInit(void);
 void interrupt ISR(void);
+void forwBack(void);
+void followTape(void);
+void startMotors(void);
 
+// ====== main ======
 void main(void)
 {
 	systemInit();
 	char run = 0;
 	
-	
 	LED = 1;
+	
 	while(1){
-#if 0
-		if(SENSOR_6)
-			LED = 0;
-		else 
-			LED = 1;
+#if 0 // debug
+		
+		RIGHT_PWM_F = SPEED_MAX;
+		LEFT_PWM_F = SPEED_MAX;
 				
-#else
+#else // main program
 		if(BUTTON)
 			run = 1;
 		
 		if(run)
 		{
-			static char state = 0;
-
-			switch(state)
-			{
-			case 0:	
-				LED = 0;
-				if(timer <= 0)
-				{
-					speed++;
-					timer = TIMER0_PULSES;
-				}
-
-				RIGHT_PWM_F = speed;
-				LEFT_PWM_F = speed;
-
-				if(speed == PWM_MAX)
-				{
-					state = 1;
-					__delay_ms(2000);
-				}
-				break;
-
-			case 1:	
-				LED = 0;
-				if(timer <= 0)
-				{
-					speed--;
-					timer = TIMER0_PULSES;
-				}
-
-				RIGHT_PWM_F = speed;
-				LEFT_PWM_F = speed;
-
-				if(speed == 0)
-				{
-					state = 2;
-					RIGHT_PWM_F = 0;
-					LEFT_PWM_F = 0;
-				}
-
-				break;
-			case 2:
-				LED = 1;
-				if(timer <= 0)
-				{
-					speed++;
-					timer = TIMER0_PULSES;
-				}
-
-				RIGHT_PWM_B = speed;
-				LEFT_PWM_B = speed;
-
-				if(speed == PWM_MAX)
-				{
-					RIGHT_PWM_B = PWM_MAX;
-					LEFT_PWM_B = PWM_MAX;
-					state = 3;
-				}
-				break;
-
-			case 3:
-				LED = 1;
-				if(timer <= 0)
-				{
-					speed--;
-					timer = TIMER0_PULSES;
-				}
-
-				RIGHT_PWM_B = speed;
-				LEFT_PWM_B = speed;
-
-				if(speed == 0)
-				{
-					state = 0;
-					RIGHT_PWM_B = 0;
-					LEFT_PWM_B = 0;
-				}
-
-				break;
-			}
-		}
+			followTape();
+		} // if(run)
 #endif
-	}
-}
+	} // while(1)
+} // main
 
 void systemInit()
 {	
@@ -216,7 +140,7 @@ void systemInit()
 	// Internal clock
 	OSCCON = 0b01111010;	// 16 MHz
 
-    // timer0 initiering till interrupt 
+    // timer00 initiering till interrupt 
 	OPTION_REG = 0b11010100;
 	INTCON	   = 0b10100000;
 	
@@ -248,8 +172,246 @@ void interrupt ISR(void)
 	GIE = 0;
     if(T0IE && T0IF)
     {
-		timer--;
+		timer0--;
         T0IF = 0;
     }
 	GIE = 1;
+}
+
+void forwBack(void)
+{
+	static char state = 0;
+	static char speed = 0;
+	
+	switch(state)
+	{
+	case 0:	
+		LED = 0;
+		if(timer0 <= 0)
+		{
+			speed++;
+			timer0 = TIMER0_PULSES;
+		}
+
+		RIGHT_PWM_F = speed;
+		LEFT_PWM_F = speed;
+
+		if(speed == PWM_MAX)
+		{
+			state = 1;
+			__delay_ms(2000);
+		}
+		break;
+
+	case 1:	
+		LED = 0;
+		if(timer0 <= 0)
+		{
+			speed--;
+			timer0 = TIMER0_PULSES;
+		}
+
+		RIGHT_PWM_F = speed;
+		LEFT_PWM_F = speed;
+
+		if(speed == 0)
+		{
+			state = 2;
+			RIGHT_PWM_F = 0;
+			LEFT_PWM_F = 0;
+		}
+
+		break;
+	case 2:
+		LED = 1;
+		if(timer0 <= 0)
+		{
+			speed++;
+			timer0 = TIMER0_PULSES;
+		}
+
+		RIGHT_PWM_B = speed;
+		LEFT_PWM_B = speed;
+
+		if(speed == PWM_MAX)
+		{
+			RIGHT_PWM_B = PWM_MAX;
+			LEFT_PWM_B = PWM_MAX;
+			state = 3;
+		}
+		break;
+
+	case 3:
+		LED = 1;
+		if(timer0 <= 0)
+		{
+			speed--;
+			timer0 = TIMER0_PULSES;
+		}
+
+		RIGHT_PWM_B = speed;
+		LEFT_PWM_B = speed;
+
+		if(speed == 0)
+		{
+			state = 0;
+			RIGHT_PWM_B = 0;
+			LEFT_PWM_B = 0;
+		}
+
+		break;
+	}	// end switch
+}
+
+void followTape(void)
+{
+	static uint8_t state = 1;
+	
+	// Temporär hastighet som den skall ställa in sig till
+	static uint8_t tempSpeed_Left_Forw = SPEED_MAX;
+	static uint8_t tempSpeed_Right_Forw = SPEED_MAX;
+	static uint8_t tempSpeed_Left_Back = 0;
+	static uint8_t tempSpeed_Right_Back = 0;
+	
+	// Den aktuella hastigheten som motorerna sätts till varje cykel
+	static uint8_t speed_Left_Forw = 0;
+	static uint8_t speed_Right_Forw = 0;
+	static uint8_t speed_Left_Back = 0;
+	static uint8_t speed_Right_Back = 0;
+	
+	switch(state)
+	{
+		case 1: // Refresh
+		
+			// Accelerering till tempSpeed
+			if(timer0 <= 0)
+			{
+				// Left
+				if (tempSpeed_Left_Forw > speed_Left_Forw)
+				{
+					if (speed_Left_Forw + deltaSpeed >= SPEED_MAX - 2)
+						speed_Left_Forw = SPEED_MAX;
+					else
+						speed_Left_Forw += deltaSpeed;
+				}
+				else if (tempSpeed_Left_Forw < speed_Left_Forw)
+				{
+					if (speed_Left_Forw <= deltaSpeed)
+						speed_Left_Forw = 0;
+					else
+						speed_Left_Forw -= deltaSpeed;
+				}
+				
+				// Right
+				if (tempSpeed_Right_Forw > speed_Right_Forw)
+				{
+					if (speed_Right_Forw + deltaSpeed >= SPEED_MAX - 2)
+						speed_Right_Forw = SPEED_MAX;
+					else
+						speed_Right_Forw += deltaSpeed;
+				}
+				else if (tempSpeed_Right_Forw < speed_Right_Forw)
+				{
+					if (speed_Right_Forw <= deltaSpeed)
+						speed_Right_Forw = 0;
+					else
+						speed_Right_Forw -= deltaSpeed;
+				}	
+				
+				timer0 = TIMER0_PULSES;
+			}
+			
+			LEFT_PWM_F = speed_Left_Forw;
+			RIGHT_PWM_F = speed_Right_Forw;
+			LEFT_PWM_B = speed_Left_Back;
+			RIGHT_PWM_B = speed_Right_Back;
+			
+			
+			// Sensorkoll
+			if (SENSOR_4 || SENSOR_5)
+				state = 2; // Forward
+			
+			if (SENSOR_6 || SENSOR_7)
+				state = 3; // Left 1
+
+			if (SENSOR_8)
+				state = 4; // Left 2
+
+			if (SENSOR_3 || SENSOR_2)
+				state = 5; // Right 1
+
+			if (SENSOR_1)
+				state = 6; // Right 2
+			
+			if (SENSOR_1 && SENSOR_8)
+				state = 5;
+			
+
+			break;
+		
+		case 2: // Forward
+			LED = 0;
+			tempSpeed_Left_Forw = SPEED_MAX;
+			tempSpeed_Right_Forw = SPEED_MAX;
+			speed_Left_Back = 0;
+			speed_Right_Back = 0;
+			
+			
+			state = 1;
+			
+			break;
+		case 3: // Left 1
+			LED = 1;
+			tempSpeed_Left_Forw = 40;
+			tempSpeed_Right_Forw = SPEED_MAX;
+			speed_Left_Back = 0;
+			speed_Right_Back = 0;
+			
+			state = 1;
+			
+			break;
+		case 4: // Left 2
+			LED = 1;
+			tempSpeed_Left_Forw = 0;
+			tempSpeed_Right_Forw = SPEED_MAX;
+			speed_Left_Back = 50;
+			speed_Right_Back = 0;
+			
+			state = 1;
+			
+			break;
+		case 5: // Right 1
+			LED = 1;
+			tempSpeed_Left_Forw = SPEED_MAX;
+			tempSpeed_Right_Forw = 40;
+			speed_Left_Back = 0;
+			speed_Right_Back = 0;
+			
+			
+			state = 1;
+			
+			break;
+		case 6: // Right 2
+			LED = 1;
+			tempSpeed_Left_Forw = SPEED_MAX;
+			tempSpeed_Right_Forw = 0;
+			speed_Left_Back = 0;
+			speed_Right_Back = 50;
+			
+			
+			state = 1;
+			
+			break;
+		case 7:	
+			LED = 1;
+			tempSpeed_Left_Forw = 0;
+			tempSpeed_Right_Forw = 0;
+			
+			state = 1;
+			
+			break;
+		default:
+			state = 1;
+			break;
+	};
 }
