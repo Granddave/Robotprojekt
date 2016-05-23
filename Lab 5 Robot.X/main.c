@@ -141,7 +141,7 @@ void systemInit()
 	OSCCON = 0b01111010;	// 16 MHz
 
     // timer00 initiering till interrupt 
-	OPTION_REG = 0b11010100;
+	OPTION_REG = 0b11010000;
 	INTCON	   = 0b10100000;
 	
 	// Timer2 initiering till PWM
@@ -287,6 +287,12 @@ void followTape(void)
 			if(timer0 <= 0)
 			{
 				// Left
+				if (speed_Left_Forw > 0 && tempSpeed_Left_Back)
+				{
+					tempSpeed_Left_Forw = 0;
+				}
+				
+				// Accelerera
 				if (tempSpeed_Left_Forw > speed_Left_Forw)
 				{
 					if (speed_Left_Forw + deltaSpeed >= SPEED_MAX - 2)
@@ -294,6 +300,7 @@ void followTape(void)
 					else
 						speed_Left_Forw += deltaSpeed;
 				}
+				// Retardera
 				else if (tempSpeed_Left_Forw < speed_Left_Forw)
 				{
 					if (speed_Left_Forw <= deltaSpeed)
@@ -303,6 +310,12 @@ void followTape(void)
 				}
 				
 				// Right
+				if (speed_Right_Forw > 0 && tempSpeed_Right_Back)
+				{
+					tempSpeed_Right_Forw = 0;
+				}
+				
+				
 				if (tempSpeed_Right_Forw > speed_Right_Forw)
 				{
 					if (speed_Right_Forw + deltaSpeed >= SPEED_MAX - 2)
@@ -331,20 +344,26 @@ void followTape(void)
 			if (SENSOR_4 || SENSOR_5)
 				state = 2; // Forward
 			
-			if (SENSOR_6 || SENSOR_7)
+			if (SENSOR_6)
 				state = 3; // Left 1
 
-			if (SENSOR_8)
+			if (SENSOR_7)
 				state = 4; // Left 2
+			
+			if (SENSOR_8)
+				state = 5; // Left 3
 
 			if (SENSOR_3 || SENSOR_2)
-				state = 5; // Right 1
+				state = 6; // Right 1
+
+			if (SENSOR_2)
+				state = 7; // Right 2
 
 			if (SENSOR_1)
-				state = 6; // Right 2
+				state = 8; // Right 3
 			
 			if (SENSOR_1 && SENSOR_8)
-				state = 5;
+				state = 8;
 			
 
 			break;
@@ -372,15 +391,26 @@ void followTape(void)
 			break;
 		case 4: // Left 2
 			LED = 1;
-			tempSpeed_Left_Forw = 0;
+			tempSpeed_Left_Forw = 20;
 			tempSpeed_Right_Forw = SPEED_MAX;
-			speed_Left_Back = 50;
+			speed_Left_Back = 0;
 			speed_Right_Back = 0;
 			
 			state = 1;
 			
 			break;
-		case 5: // Right 1
+			
+		case 5: // Left 3
+			LED = 1;
+			tempSpeed_Left_Forw = 0;
+			tempSpeed_Right_Forw = SPEED_MAX;
+			speed_Left_Back = 40;
+			speed_Right_Back = 0;
+			
+			state = 1;
+			
+			break;
+		case 6: // Right 1
 			LED = 1;
 			tempSpeed_Left_Forw = SPEED_MAX;
 			tempSpeed_Right_Forw = 40;
@@ -391,18 +421,28 @@ void followTape(void)
 			state = 1;
 			
 			break;
-		case 6: // Right 2
+		case 7: // Right 2
+			LED = 1;
+			tempSpeed_Left_Forw = SPEED_MAX;
+			tempSpeed_Right_Forw = 20;
+			speed_Left_Back = 0;
+			speed_Right_Back = 0;
+			
+			
+			state = 1;
+		
+		case 8: // Right 3
 			LED = 1;
 			tempSpeed_Left_Forw = SPEED_MAX;
 			tempSpeed_Right_Forw = 0;
 			speed_Left_Back = 0;
-			speed_Right_Back = 50;
+			speed_Right_Back = 40;
 			
 			
 			state = 1;
 			
 			break;
-		case 7:	
+		case 9:	
 			LED = 1;
 			tempSpeed_Left_Forw = 0;
 			tempSpeed_Right_Forw = 0;
